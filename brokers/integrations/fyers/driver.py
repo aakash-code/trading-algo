@@ -421,7 +421,7 @@ class FyersDriver(BrokerDriver):
             return out
         return out
 
-    def get_history(self, symbol: str, interval: str, start: str, end: str) -> List[Dict[str, Any]]:
+    def get_history(self, symbol: str, interval: str, start: str, end: str, oi: bool = False) -> List[Dict[str, Any]]:
         if not self._fyers_model:
             return []
         interval_map = {
@@ -451,6 +451,7 @@ class FyersDriver(BrokerDriver):
                 "range_from": start,
                 "range_to": end,
                 "cont_flag": "1",
+                "oi_flag": "1" if oi else "0",
             }
             resp = self._fyers_model.history(payload)
             if not (isinstance(resp, dict) and resp.get("s") == "ok"):
@@ -471,6 +472,7 @@ class FyersDriver(BrokerDriver):
                 l = float(c[3])
                 cl = float(c[4])
                 vol = int(c[5]) if len(c) > 5 and c[5] is not None else None
+                oi = int(c[6]) if len(c) > 6 and c[6] is not None else None
                 out.append({
                     "ts": ts,
                     "open": o,
@@ -478,6 +480,7 @@ class FyersDriver(BrokerDriver):
                     "low": l,
                     "close": cl,
                     "volume": vol,
+                    "oi": oi,
                 })
             return out
         except Exception as E:
@@ -485,7 +488,15 @@ class FyersDriver(BrokerDriver):
 
     # --- Instruments ---
     def download_instruments(self) -> None:
-        self.master_contract_url = "https://public.fyers.in/sym_details/NSE_FO.csv"
+        self.master_contract_urls = [
+            "https://public.fyers.in/sym_details/NSE_FO.csv", 
+            "https://public.fyers.in/sym_details/BSE_FO.csv", 
+            "https://public.fyers.in/sym_details/NSE_CD.csv", 
+            "https://public.fyers.in/sym_details/NSE_COM.csv", 
+            "https://public.fyers.in/sym_details/NSE_CM.csv", 
+            "https://public.fyers.in/sym_details/BSE_CM.csv", 
+            "https://public.fyers.in/sym_details/MCX_COM.csv"
+            ]
         self.master_contract_df = None
         self.cache_file = ".cache/fyers_master_contract.csv"
         
@@ -494,17 +505,19 @@ class FyersDriver(BrokerDriver):
             14: "INDEX",  # Index instruments
             15: "STOCK"   # Stock instruments
         }
-
+        response_text = ""
         # Download the CSV file
-        response = requests.get(self.master_contract_url, timeout=30)
-        response.raise_for_status()
-        
+        for url in self.master_contract_urls:
+            response_temp = requests.get(url, timeout=30)
+            response_temp.raise_for_status()
+            response_text += response_temp.text
+
         # Save to file
         if not os.path.exists(os.path.dirname(self.cache_file)):
             os.makedirs(os.path.dirname(self.cache_file))
             
         with open(self.cache_file, 'w') as f:
-            f.write(response.text)
+            f.write(response_text)
         
         # Define column headers
         headers = [
@@ -536,13 +549,32 @@ class FyersDriver(BrokerDriver):
         # Read as DataFrame with headers
         df = pd.read_csv(self.cache_file, names=headers, header=None)
         df = df[header_mapping.keys()]
+
         df.columns = header_mapping.values()
-        # df['instrument_type'] = df['instrument_type'].map(self.instrument_types) # MAPPING TO STOCK/INDEX TODO - NOT USED MAYBE
+        df['instrument_type'] = df['instrument_type'].map(self.instrument_types) # MAPPING TO STOCK/INDEX TODO - NOT USED MAYBE
         df['instrument_type'] = df['symbol'].apply(lambda x: 'FUT' if x.endswith("FUT") else 'CE' if x.endswith("CE") else 'PE' if x.endswith("PE") else 'EQ')
-        df['expiry'] = pd.to_datetime(df['expiry'], unit='s').dt.date
+        df['expiry'] = pd.to_datetime(df['expiry'], unit='s', errors='coerce')
+        df['expiry'] = df['expiry'].apply(lambda x: pd.to_datetime(x).date() if not pd.isna(x) else np.nan)
         df['days_to_expiry'] = df['expiry'].apply(lambda x: np.busday_count(datetime.now().date(), x) + 1 if not pd.isna(x) else np.nan)
         # Updating Segment matching to match with what we have in the zerodha
-        df['segment'] = df['symbol'].apply(lambda x: "NFO-FUT" if x.endswith("FUT") else "NFO-OPT")
+        def segment_mapping(x):
+            if x.endswith("FUT"):
+                if x.startswith("NSE"):
+                    return "NFO-FUT"
+                elif x.startswith("BSE"):
+                    return "BFO-FUT"
+            elif x.endswith("CE") or x.endswith("PE"):
+                if x.startswith("NSE"):
+                    return "NFO-OPT"
+                elif x.startswith("BSE"):
+                    return "BFO-OPT"
+            else:
+                if x.startswith("NSE"):
+                    return "NSE"
+                elif x.startswith("BSE"):
+                    return "BSE"
+        df['segment'] = df['symbol'].apply(segment_mapping)
+        df.to_csv(self.cache_file, index=False)
         self.master_contract_df = df
 
     def get_instruments(self) -> List[Instrument]:
@@ -564,6 +596,8 @@ class FyersDriver(BrokerDriver):
             "NIFTY 50": "NIFTY50-INDEX",
             "NIFTY BANK": "NIFTYBANK-INDEX",
             "FINNIFTY": "FINNIFTY-INDEX",
+            "SENSEX": "SENSEX-INDEX",
+            "BANKEX": "BANKEX-INDEX",
         }
         if sym_u in index_map:
             sym_part = index_map[sym_u]

@@ -77,6 +77,9 @@ class WaveStrategy:
         self.prev_wave_buy_price = None
         self.prev_quote_price = None
 
+        self.prev_wave_sell_qty = None
+        self.prev_wave_buy_qty = None
+
         self.handle_order_update_call_tracker = {}
         self.handle_order_update_call_tracker_response_dict = {}
 
@@ -362,6 +365,9 @@ class WaveStrategy:
                 price=final_sell_price, tag=self.tag
             ) # TODO: Variety Supported is only Regular for now
             sell_order_resp = self.broker.place_order(req)
+
+            logger.info("Sell Order Response - {}".format(sell_order_resp))
+
             sell_order_id = sell_order_resp.order_id
             if sell_order_id not in self.orders:
                 self.handle_order_update_call_tracker[sell_order_id] = False
@@ -381,6 +387,7 @@ class WaveStrategy:
                 price=final_buy_price, tag=self.tag
             ) # TODO: Variety Supported is only Regular for now
             buy_order_resp = self.broker.place_order(req)
+            logger.info("Buy Order Response - {}".format(buy_order_resp))
             buy_order_id = buy_order_resp.order_id
             self.handle_order_update_call_tracker[buy_order_id] = False
             if buy_order_id != -1:
@@ -478,6 +485,29 @@ class WaveStrategy:
             final_prices = self._prepare_final_prices(scaled_buy_gap, scaled_sell_gap)
             logger.info(f"Final Prices -> Buy: {final_prices['buy']:.2f}, Sell: {final_prices['sell']:.2f}")
 
+
+            second_buy_price = None
+            second_sell_price = None
+
+            if self.prev_wave_buy_price is not None: 
+                second_buy_price = self.prev_wave_buy_price
+            else:
+                second_buy_price = final_prices['buy']
+
+
+
+            logger.info(f"Last Wave Values {self.prev_wave_buy_price}, Sell: {self.prev_wave_sell_price}")
+
+            if self.prev_wave_sell_price is not None:
+                second_sell_price = self.prev_wave_sell_price
+            else:
+                second_sell_price = final_prices['sell']
+
+            final_prices = self._get_best_buy_sell_price(
+                final_prices['buy'],  second_buy_price,
+                final_prices['sell'], second_sell_price
+            )
+
             # Special case to treat for NIFTY -  If the product is NIFTY and buy price is less than 25, 
             # the buy restrict order is not considered and the buy order is placed. 
             # This is done to save on the margins by closing the position.
@@ -487,7 +517,8 @@ class WaveStrategy:
                 logger.warning(f"Updated Restrictions- Buy: {restrict_buy_order}, Sell: {restrict_sell_order}")
 
             self._execute_orders(symbol, final_prices['buy'], final_prices['sell'], restrict_buy_order, restrict_sell_order)
-            
+
+
             self.prev_wave_buy_price = final_prices['buy']
             self.prev_wave_sell_price = final_prices['sell']
             
@@ -586,22 +617,23 @@ class WaveStrategy:
                 logger.warning("Sell order is missing.")
                 if self.prev_wave_sell_price is not None:
                     final_sell_price = self.prev_wave_sell_price
+                    final_sell_qty = self.prev_wave_sell_qty
 
                     if self.already_executing_order == 0:
                         sell_order_resp = self.broker.place_order(
                             symbol=symbol, exchange=Exchange.NFO, transaction_type=TransactionType.SELL,
-                            quantity=self.sell_quantity, product_type=ProductType.MARGIN, order_type=OrderType.LIMIT,
+                            quantity=final_sell_qty, product_type=ProductType.MARGIN, order_type=OrderType.LIMIT,
                             price=final_sell_price, tag=self.tag
                         )
                         sell_order_id = sell_order_resp.order_id
                         self.handle_order_update_call_tracker[sell_order_id] = False
                         if buy_order_present:
-                            self.add_order_to_list(sell_order_id, final_sell_price, self.sell_quantity, "SELL", symbol, buy_order_id)
+                            self.add_order_to_list(sell_order_id, final_sell_price, final_sell_qty, "SELL", symbol, buy_order_id)
                             self.orders[buy_order_id]['associated_order'] = sell_order_id
                             if not self.handle_order_update_call_tracker[sell_order_id]:
                                 self.handle_order_update(self.handle_order_update_call_tracker_response_dict[sell_order_id])
                         else:
-                            self.add_order_to_list(sell_order_id, final_sell_price, self.sell_quantity, "SELL", symbol, -1)
+                            self.add_order_to_list(sell_order_id, final_sell_price, final_sell_qty, "SELL", symbol, -1)
                             if not self.handle_order_update_call_tracker[sell_order_id]:
                                 self.handle_order_update(self.handle_order_update_call_tracker_response_dict[sell_order_id])
                 else:
@@ -611,22 +643,23 @@ class WaveStrategy:
                 logger.warning("Buy order is missing.")
                 if self.prev_wave_buy_price is not None:
                     final_buy_price = self.prev_wave_buy_price
+                    final_quantity = self.prev_wave_buy_qty
 
                     if self.already_executing_order == 0:
                         buy_order_resp = self.broker.place_order(
                             symbol=symbol, exchange=Exchange.NFO, transaction_type=TransactionType.BUY,
-                            quantity=self.buy_quantity, product_type=ProductType.MARGIN, order_type=OrderType.LIMIT,
+                            quantity=final_quantity, product_type=ProductType.MARGIN, order_type=OrderType.LIMIT,
                             price=final_buy_price, tag=self.tag
                         )
                         buy_order_id = buy_order_resp.order_id  
                         self.handle_order_update_call_tracker[buy_order_id] = False
                         if sell_order_present:
-                            self.add_order_to_list(buy_order_id, final_buy_price, self.buy_quantity, "BUY", symbol, sell_order_id)
+                            self.add_order_to_list(buy_order_id, final_buy_price, final_quantity, "BUY", symbol, sell_order_id)
                             self.orders[sell_order_id]['associated_order'] = buy_order_id
                             if not self.handle_order_update_call_tracker[buy_order_id]:
                                 self.handle_order_update(self.handle_order_update_call_tracker_response_dict[buy_order_id])
                         else:
-                            self.add_order_to_list(buy_order_id, final_buy_price, self.buy_quantity, "BUY", symbol, -1)
+                            self.add_order_to_list(buy_order_id, final_buy_price, self.final_quantity, "BUY", symbol, -1)
                             if not self.handle_order_update_call_tracker[buy_order_id]:
                                 self.handle_order_update(self.handle_order_update_call_tracker_response_dict[buy_order_id])
                 else:
@@ -636,7 +669,7 @@ class WaveStrategy:
             logger.error(f"Error in check_and_enforce_restrictions_on_active_orders: {e}", exc_info=True)
         
     def check_is_any_order_active(self) -> bool:
-        """Check if there are any active orders"""
+        logger.info("Current Order List - {}".format(self.orders))
         for order_id, order_info in self.orders.items():
             if order_id == -1:
                 continue
@@ -701,7 +734,7 @@ class WaveStrategy:
         del self.orders[order_id]
         self.order_tracker.remove_order(order_id)
         
-        self.place_wave_orders()
+        self.place_wave_order()
         self.print_current_status()
 
     def _remove_order(self, order_id: str):
@@ -770,46 +803,57 @@ class WaveStrategy:
             self.handle_order_update_call_tracker[order_id] = True
             order_info = self.orders[order_id]
             status = order_data.get('status', order_data.get('orders', {}).get('status', 'N/A'))
-            associated_order_id = order_data.get('associated_order', order_data.get('orders', {}).get('associated_order', 'N/A'))
+            associated_order_id = order_info.get('associated_order', order_info.get('orders', {}).get('associated_order', 'N/A'))
+
+
+            logger.info(f"associated order id = {associated_order_id} --- ")
             
             if status == 'COMPLETE' or status == 2: # TODO: Check this - this is for fyers and zerodha
                 logger.info(f"Order {order_id} executed successfully")
                 self._complete_order(order_id)
                 self.order_tracker.record_order_complete(order_id, order_info['transaction_type'])
+                self.prev_wave_buy_price = None
+                self.prev_wave_sell_price = None
                 
                     
             elif status == 'CANCELLED' or status == 1:
                 logger.info(f"Order {order_id} was cancelled")
-                self._remove_order(order_id)
                 # Cancel the associated order if the main order is cancelled anda if it exists
                 if associated_order_id != -1:
                     self._remove_order(associated_order_id)
+                self._remove_order(order_id)
 
-            elif status == 'OPEN' or status == 6:
+            elif (status == 'OPEN' or status == 'UPDATE') or status == 6: #TODO Vibhu - Need to check update status for Fryers
                 # Update order details
                 if 'price' in order_data:
+                    logger.info(f"There is price in Order_Info = {order_data} - "+str(order_data.get('price')))
                     self.orders[order_id]['price'] = order_data.get('price', order_data.get('orders', {}).get('limitPrice', 'N/A'))
                 if 'quantity' in order_data:
                     self.orders[order_id]['quantity'] = order_data.get('quantity', order_data.get('orders', {}).get('qty', 'N/A'))
                 logger.info(f"Order {order_id} updated: {self.orders[order_id]}")
+
+                side = order_data.get('transaction_type', order_data.get('orders', {}).get('side', 'N/A'))
+                if side == 'BUY':
+                    self.prev_wave_buy_price = order_data.get('price', order_data.get('orders', {}).get('limitPrice', 'N/A'))
+                    self.prev_wave_buy_qty = order_data.get('quantity', order_data.get('orders', {}).get('quantity', 'N/A')) #TODO Vibhu - here the parameter has to be checked.
+                    logger.info(f"Updated Previous Wave Buy Price: {self.prev_wave_buy_price}")
+        
+                if side == 'SELL':
+                    self.prev_wave_sell_price = order_data.get('price', order_data.get('orders', {}).get('limitPrice', 'N/A'))
+                    self.prev_wave_sell_qty = order_data.get('quantity', order_data.get('orders', {}).get('quantity', 'N/A')) #TODO - here the parameter has to be checked.
+                    logger.info(f"Updated Previous Wave Sell Price: {self.prev_wave_sell_price}")
+             
             elif status == 'REJECTED' or status == 5:
                 logger.warning(f"Order {order_id} was rejected, Reason - {order_data.get('status_message', order_data.get('orders', {}).get('message', 'N/A'))}")
-                self._remove_order(order_id)
                 # Cancel the associated order if the main order is cancelled anda if it exists
                 if associated_order_id != -1:
                     self._remove_order(associated_order_id)
-                
+                self._remove_order(order_id)
             else:
                 logger.info(f"Order {order_id} status: {status} | NOT HANDLED")
-            side = order_data.get('transaction_type', order_data.get('orders', {}).get('side', 'N/A'))
-            if side == 'BUY':
-                self.prev_wave_buy_price = order_data.get('price', order_data.get('orders', {}).get('limitPrice', 'N/A'))
-                logger.info(f"Updated Previous Wave Buy Price: {self.prev_wave_buy_price}")
-        
-            if side == 'SELL':
-                self.prev_wave_sell_price = order_data.get('price', order_data.get('orders', {}).get('limitPrice', 'N/A'))
-                logger.info(f"Updated Previous Wave Sell Price: {self.prev_wave_sell_price}")
-                
+
+
+               
         else:
             logger.warning(f"Unknown order update: {order_data.get('transaction_type', order_data.get('orders', {}).get('side', 'N/A'))} -- "
                         f"{order_data.get('tradingsymbol', order_data.get('orders', {}).get('symbol', 'N/A'))} -- {order_data.get('price', order_data.get('orders', {}).get('limitPrice', 'N/A'))}")

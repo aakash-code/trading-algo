@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 import os
 from typing import Any, Dict, List, Optional
+from urllib import request
 
 from ...core.enums import Exchange, OrderType, ProductType, TransactionType, Validity
 from ...core.errors import MarginUnavailableError, UnsupportedOperationError
@@ -221,7 +222,8 @@ class ZerodhaDriver(BrokerDriver):
             product = M.product_type["zerodha"][request.product_type]
             txn_type = M.transaction_type["zerodha"][request.transaction_type]
             validity = M.validity["zerodha"][request.validity]
-
+            if request.price <= 0:
+                request.price = 0.05
             order_id = self._kite.place_order(
                 variety=self._kite.VARIETY_REGULAR,
                 exchange=request.exchange.value,

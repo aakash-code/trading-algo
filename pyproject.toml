@@ -1,3 +1,6 @@
+[tool.setuptools.packages.find]
+include = ["brokers*", "strategy*"]
+
 [project]
 name = "trading-algo"
 version = "0.1.0"
@@ -5,6 +8,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "dhanhq>=1.8.4",
     "fyers-apiv3>=3.1.7",
     "kiteconnect>=5.0.1",
     "mibian>=0.1.3",

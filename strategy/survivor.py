@@ -617,6 +617,7 @@ if __name__ == "__main__":
     from orders import OrderTracker
     from strategy.survivor import SurvivorStrategy
     from brokers.zerodha import ZerodhaBroker
+    from brokers.dhan import DhanBroker
     from logger import logger
     from queue import Queue
     import random
@@ -801,6 +802,9 @@ PARAMETER GROUPS:
                         help='Path to YAML configuration file containing default values. '
                              'Defaults to system/strategy/configs/survivor.yml')
         
+        parser.add_argument('--broker', type=str, default='zerodha', choices=['zerodha', 'dhan'],
+                        help='The broker to use for trading.')
+
         return parser
 
     def show_config(config):
@@ -1048,30 +1052,36 @@ PARAMETER GROUPS:
     # SECTION 4: TRADING INFRASTRUCTURE SETUP
     # ==========================================================================
     
-    
     # Create broker interface for market data and order execution
-    if os.getenv("BROKER_TOTP_ENABLE") == "true":
-        logger.info("Using TOTP login flow")
-        broker = ZerodhaBroker(without_totp=False)
+    if args.broker == 'zerodha':
+        if os.getenv("BROKER_TOTP_ENABLE") == "true":
+            logger.info("Using Zerodha with TOTP login")
+            broker = ZerodhaBroker(without_totp=False)
+        else:
+            logger.info("Using Zerodha with normal login")
+            broker = ZerodhaBroker(without_totp=True)
+    elif args.broker == 'dhan':
+        logger.info("Using Dhan broker")
+        broker = DhanBroker()
     else:
-        logger.info("Using normal login flow")
-        broker = ZerodhaBroker(without_totp=True)
+        logger.error(f"Unsupported broker: {args.broker}")
+        sys.exit(1)
     
     # Create order tracking system for position management
     order_tracker = OrderTracker() 
     
-    # Get instrument token for the underlying index
-    # This token is used for websocket subscription to receive real-time price updates
-    try:
-        quote_data = broker.get_quote(config['index_symbol'])
-        instrument_token = quote_data[config['index_symbol']]['instrument_token']
-        logger.info(f"✓ Index instrument token obtained: {instrument_token}")
-    except Exception as e:
-        logger.error(f"Failed to get instrument token for {config['index_symbol']}: {e}")
-        sys.exit(1)
+    # Get instrument token for the underlying index (for Zerodha)
+    instrument_token = None
+    if args.broker == 'zerodha':
+        try:
+            quote_data = broker.get_quote(config['index_symbol'])
+            instrument_token = quote_data[config['index_symbol']]['instrument_token']
+            logger.info(f"✓ Index instrument token obtained: {instrument_token}")
+        except Exception as e:
+            logger.error(f"Failed to get instrument token for {config['index_symbol']}: {e}")
+            sys.exit(1)
 
     # Initialize data dispatcher for handling real-time market data
-    # The dispatcher manages queues and routes market data to strategy
     dispatcher = DataDispatcher()
     dispatcher.register_main_queue(Queue())
 
@@ -1080,7 +1090,6 @@ PARAMETER GROUPS:
     # ==========================================================================
     
     # Define websocket event handlers for real-time data processing
-    
     def on_ticks(ws, ticks):
         logger.debug("Received ticks: {}".format(ticks))
         # Send tick data to strategy processing queue
@@ -1088,17 +1097,16 @@ PARAMETER GROUPS:
 
     def on_connect(ws, response):
         logger.info("Websocket connected successfully: {}".format(response))
-        
-        # Subscribe to the underlying index instrument
-        ws.subscribe([instrument_token])
-        logger.info(f"✓ Subscribed to instrument token: {instrument_token}")
-        
-        # Set full mode to receive complete market data (LTP, volume, OI, etc.)
-        ws.set_mode(ws.MODE_FULL, [instrument_token])
+        if args.broker == 'zerodha':
+            # Subscribe to the underlying index instrument
+            ws.subscribe([instrument_token])
+            logger.info(f"✓ Subscribed to instrument token: {instrument_token}")
+
+            # Set full mode to receive complete market data
+            ws.set_mode(ws.MODE_FULL, [instrument_token])
 
     def on_order_update(ws, data):
         logger.info("Order update received: {}".format(data))
-        
 
     # Assign callbacks to broker's websocket instance
     broker.on_ticks = on_ticks
@@ -1109,11 +1117,14 @@ PARAMETER GROUPS:
     # SECTION 6: STRATEGY INITIALIZATION AND WEBSOCKET START
     # ==========================================================================
     
-    # Start websocket connection for real-time data
-    broker.connect_websocket()
-
     # Initialize the trading strategy with all dependencies
     strategy = SurvivorStrategy(broker, config, order_tracker)
+
+    # Start websocket connection for real-time data
+    if args.broker == 'zerodha':
+        broker.connect_websocket()
+    elif args.broker == 'dhan':
+        broker.subscribe_and_connect(config['index_symbol'])
 
     # ==========================================================================
     # SECTION 7: MAIN TRADING LOOP

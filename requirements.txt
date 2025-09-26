@@ -1,0 +1,9 @@
+requests
+pyotp
+python-dotenv
+kiteconnect
+pandas
+PyYAML
+rich
+beepy
+dhanhq

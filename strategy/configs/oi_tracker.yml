@@ -1,0 +1,37 @@
+# Configuration for the OI Tracker Strategy
+
+# A list of underlyings to watch. The strategy will create a set of tables for each item.
+watchlists:
+  - enabled: true
+    underlying_symbol: 'NSE:NIFTY 50'
+    option_symbol_prefix: 'NIFTY24JUL'
+    strike_difference: 50
+    # Signal generation config for this specific underlying
+    signal_generation_interval: 5
+    call_buy_oi_change_p_threshold: 10
+    call_sell_oi_change_p_threshold: -10
+    put_buy_oi_change_p_threshold: 10
+    put_sell_oi_change_p_threshold: -10
+    price_change_p_for_confirmation: 0.1
+
+  - enabled: false # Set to true to enable tracking for this stock
+    underlying_symbol: 'NSE:RELIANCE' # Example for a stock
+    option_symbol_prefix: 'RELIANCE24JUL'
+    strike_difference: 20
+    # Signal generation config for this specific underlying
+    signal_generation_interval: 5
+    call_buy_oi_change_p_threshold: 8
+    call_sell_oi_change_p_threshold: -8
+    put_buy_oi_change_p_threshold: 8
+    put_sell_oi_change_p_threshold: -8
+    price_change_p_for_confirmation: 0.2
+
+# --- Global Alerting Configuration ---
+# These settings apply to all watchlists.
+oi_alert_percentage: 5
+nifty_alert_percentage: 0.5 # This will be used for any underlying, despite the name
+alert_threshold: 5 # Total number of red cells across all tables to trigger a sound
+
+# --- Global Strategy Configuration ---
+refresh_interval: 60 # in seconds
+intervals: [3, 5, 10, 15, 30, 180] # in minutes

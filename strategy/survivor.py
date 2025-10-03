@@ -617,6 +617,9 @@ if __name__ == "__main__":
     from orders import OrderTracker
     from strategy.survivor import SurvivorStrategy
     from brokers.zerodha import ZerodhaBroker
+    from brokers.fyers import FyersBroker
+    from brokers.dhan import DhanBroker
+    from brokers.upstox import UpstoxBroker
     from logger import logger
     from queue import Queue
     import random
@@ -1047,15 +1050,37 @@ PARAMETER GROUPS:
     # ==========================================================================
     # SECTION 4: TRADING INFRASTRUCTURE SETUP
     # ==========================================================================
-    
-    
+
+
     # Create broker interface for market data and order execution
-    if os.getenv("BROKER_TOTP_ENABLE") == "true":
-        logger.info("Using TOTP login flow")
-        broker = ZerodhaBroker(without_totp=False)
+    broker_name = os.getenv("BROKER_NAME", "zerodha").lower()
+    logger.info(f"Initializing broker: {broker_name}")
+
+    if broker_name == "zerodha":
+        if os.getenv("BROKER_TOTP_ENABLE") == "true":
+            logger.info("Using Zerodha with TOTP login flow")
+            broker = ZerodhaBroker(without_totp=False)
+        else:
+            logger.info("Using Zerodha with normal login flow")
+            broker = ZerodhaBroker(without_totp=True)
+
+    elif broker_name == "fyers":
+        logger.info("Using Fyers broker")
+        broker = FyersBroker(symbols=[])  # Symbols will be set later
+
+    elif broker_name == "dhan":
+        logger.info("Using Dhan broker")
+        broker = DhanBroker()
+
+    elif broker_name == "upstox":
+        oauth_disabled = os.getenv("BROKER_ACCESS_TOKEN", "") == ""
+        logger.info(f"Using Upstox broker (OAuth flow: {oauth_disabled})")
+        broker = UpstoxBroker(without_oauth=oauth_disabled)
+
     else:
-        logger.info("Using normal login flow")
-        broker = ZerodhaBroker(without_totp=True)
+        logger.error(f"Unsupported broker: {broker_name}")
+        logger.error("Supported brokers: zerodha, fyers, dhan, upstox")
+        sys.exit(1)
     
     # Create order tracking system for position management
     order_tracker = OrderTracker() 

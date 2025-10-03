@@ -158,7 +158,11 @@ else:
 broker.get_quote("NSE:NIFTY 50")
 broker.place_order(...)
 broker.connect_websocket()
-```
+```<img width="1920" height="1080" alt="Screenshot 2025-10-03 at 8 49 45 PM" src="https://github.com/user-attachments/assets/79640ed4-358e-4364-be78-6f66eeacd900" />
+<img width="1920" height="1080" alt="Screenshot 2025-10-03 at 8 50 13 PM" src="https://github.com/user-attachments/assets/69da3605-4afd-41a7-8b6a-65e5ead02244" />
+<img width="1920" he![Uploading Screenshot 2025-10-03 at 8.51.54 PM.png…]()
+ight="1080" alt="Screenshot 2025-10-03 at 8 51 20 PM" src="https://github.com/user-attachments/assets/5280491d-14e4-4836-bb15-53490d6edeab" />
+<img width="1920" height="1080" alt="Screenshot 2025-10-03 at 8 52 15 PM" src="https://github.com/user-attachments/assets/5c6e19bf-3dad-414d-a31f-b6839208ff95" />
 
 For more details, check the individual broker implementations and example strategies in the `strategy/` folder.
 

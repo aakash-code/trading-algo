@@ -1,7 +1,7 @@
 # trading-algo
 Code for certain trading strategies
-1. Survivor Algo
-2. Wave Algo
+1. [Survivor Algo](https://raahibhushan.substack.com/p/the-survivor-an-algorithm-for-when)
+2. [Wave Algo](https://raahibhushan.substack.com/p/the-wave-extractor-algo-2)
 
 ### Note
 Please test the code on your own setup and verify that it works as expected.  

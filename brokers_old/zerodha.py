@@ -6,7 +6,7 @@ from typing import Dict, Any, Optional, List
 import requests
 import hashlib, pyotp
 from dotenv import load_dotenv
-from brokers.base import BrokerBase
+from brokers_old.base import BrokerBase
 from kiteconnect import KiteConnect, KiteTicker
 import pandas as pd
 from threading import Thread
@@ -160,6 +160,8 @@ class ZerodhaBroker(BrokerBase):
     def get_quote(self, symbol):
         return self.kite.quote(symbol)
     
+    def get_order_status(self, order_id):
+        return self.kite.order_history(order_id)
 
     def get_positions(self):
         return self.kite.positions()
@@ -255,3 +257,9 @@ class ZerodhaBroker(BrokerBase):
         self.kite_ws.on_noreconnect = self.on_noreconnect
         self.kite_ws.connect(threaded=True)
         
+if __name__ == "__main__":
+    broker = ZerodhaBroker(without_totp=False)
+    broker.download_instruments()
+    df = broker.get_instruments()
+    df = df[df['instrument_type'] == 'CE']
+    print(df.head().T)

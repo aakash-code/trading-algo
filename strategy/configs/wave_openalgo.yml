@@ -1,0 +1,73 @@
+# OpenAlgo Wave Trading Strategy Configuration
+# =============================================
+#
+# This is the OpenAlgo-compatible version of the Wave Strategy configuration.
+# This is a simplified version that maintains core wave trading logic.
+#
+# STRATEGY OVERVIEW:
+# ==================
+# Wave-based directional trading:
+# - Buy on price dips, sell on price rises
+# - Dynamic gap scaling based on position imbalance
+# - Position tracking and management
+#
+# OPENALGO SETUP:
+# ===============
+# 1. Install OpenAlgo: pip install openalgo
+# 2. Ensure OpenAlgo server is running (default: http://127.0.0.1:5000)
+# 3. Set environment variables:
+#    - OPENALGO_API_KEY: Your OpenAlgo API key
+#    - OPENALGO_HOST: OpenAlgo server URL (optional, defaults to localhost:5000)
+#
+# NOTE: This simplified version does not include advanced Greeks calculations
+# and delta-neutral hedging from the original wave.py. For those features,
+# use the original wave.py with custom broker integration.
+
+default:
+  # ========================================================================
+  # CORE TRADING PARAMETERS
+  # ========================================================================
+
+  # Trading symbol (futures or options)
+  # For OpenAlgo, use simple symbol names
+  symbol_name: "NIFTY25JANFUT"
+
+  # Exchange for trading
+  exchange: "NFO"
+
+  # ========================================================================
+  # GAP PARAMETERS
+  # ========================================================================
+
+  # Price drop threshold to trigger buy orders
+  buy_gap: 25
+
+  # Price rise threshold to trigger sell orders
+  sell_gap: 25
+
+  # Cooldown time between order placements (seconds)
+  cool_off_time: 10
+
+  # ========================================================================
+  # POSITION SIZING
+  # ========================================================================
+
+  # Base quantity for buy orders
+  buy_quantity: 75
+
+  # Base quantity for sell orders
+  sell_quantity: 75
+
+  # Lot size for the instrument
+  lot_size: 75
+
+  # ========================================================================
+  # ORDER EXECUTION PARAMETERS
+  # ========================================================================
+
+  # Product type for orders
+  # OpenAlgo supports: MIS (intraday), CNC (delivery), NRML (normal)
+  product_type: "NRML"
+
+  # Strategy tag for order identification
+  tag: "WaveOpenAlgo"

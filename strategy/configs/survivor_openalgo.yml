@@ -1,0 +1,119 @@
+# OpenAlgo Survivor Options Trading Strategy Configuration
+# =============================================
+#
+# This is the OpenAlgo-compatible version of the Survivor Strategy configuration.
+# It works with the OpenAlgo platform for broker-agnostic trading.
+#
+# STRATEGY OVERVIEW:
+# ==================
+# The strategy monitors NIFTY price movements and sells options when the index moves
+# beyond certain thresholds:
+# - PE (Put) Trading: Triggered when NIFTY moves UP beyond pe_gap threshold
+# - CE (Call) Trading: Triggered when NIFTY moves DOWN beyond ce_gap threshold
+#
+# OPENALGO SETUP:
+# ===============
+# 1. Install OpenAlgo: pip install openalgo
+# 2. Ensure OpenAlgo server is running (default: http://127.0.0.1:5000)
+# 3. Set environment variables:
+#    - OPENALGO_API_KEY: Your OpenAlgo API key
+#    - OPENALGO_HOST: OpenAlgo server URL (optional, defaults to localhost:5000)
+
+default:
+  # ========================================================================
+  # CORE TRADING PARAMETERS
+  # ========================================================================
+
+  # Underlying index symbol for price tracking
+  # For OpenAlgo, use simple symbol names without exchange prefix
+  index_symbol: "NIFTY 50"
+
+  # Option series identifier - must match current trading option series
+  # Format: NIFTY + expiry date (e.g., NIFTY25JAN30 for 30th Jan 2025)
+  symbol_initials: "NIFTY25JAN30"
+
+  # ========================================================================
+  # GAP PARAMETERS - TRADE TRIGGERING THRESHOLDS
+  # ========================================================================
+
+  # Price movement threshold to trigger PE (Put) option sells
+  # When NIFTY rises by this many points, PE trade is triggered
+  pe_gap: 20
+
+  # Price movement threshold to trigger CE (Call) option sells
+  # When NIFTY falls by this many points, CE trade is triggered
+  ce_gap: 20
+
+  # ========================================================================
+  # POSITION SIZING PARAMETERS
+  # ========================================================================
+
+  # Base quantity for PE option trades
+  # Total quantity = pe_quantity × sell_multiplier
+  pe_quantity: 75
+
+  # Base quantity for CE option trades
+  # Total quantity = ce_quantity × sell_multiplier
+  ce_quantity: 75
+
+  # ========================================================================
+  # STRIKE SELECTION PARAMETERS
+  # ========================================================================
+
+  # Distance below current NIFTY price for PE strike selection
+  pe_symbol_gap: 200
+
+  # Distance above current NIFTY price for CE strike selection
+  ce_symbol_gap: 200
+
+  # ========================================================================
+  # RISK MANAGEMENT PARAMETERS
+  # ========================================================================
+
+  # Minimum option premium threshold for trade execution
+  min_price_to_sell: 15
+
+  # Maximum allowed position multiplier for risk control
+  sell_multiplier_threshold: 5
+
+  # ========================================================================
+  # REFERENCE RESET PARAMETERS
+  # ========================================================================
+
+  # Favorable movement threshold to reset PE reference value
+  pe_reset_gap: 30
+
+  # Favorable movement threshold to reset CE reference value
+  ce_reset_gap: 30
+
+  # ========================================================================
+  # STARTING REFERENCE POINTS
+  # ========================================================================
+
+  # Initial PE reference value (0 = use current market price)
+  pe_start_point: 0
+
+  # Initial CE reference value (0 = use current market price)
+  ce_start_point: 0
+
+  # ========================================================================
+  # ORDER EXECUTION PARAMETERS (OpenAlgo Format)
+  # ========================================================================
+
+  # Transaction type for all orders
+  trans_type: "SELL"
+
+  # Exchange for trading options
+  # For OpenAlgo, use: NSE, NFO, BSE, etc.
+  exchange: "NFO"
+
+  # Order type for execution
+  # OpenAlgo supports: MARKET, LIMIT
+  order_type: "MARKET"
+
+  # Product type for margin and position management
+  # OpenAlgo supports: MIS (intraday), CNC (delivery), NRML (normal)
+  product_type: "NRML"
+
+  # Strategy tag for order identification
+  tag: "SurvivorOpenAlgo"
